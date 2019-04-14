@@ -54,7 +54,7 @@ and is repeated twice.
 
 ```
  Opcode | OP TP |
-        7       0
+ 7              0
 ```
 
 ```
@@ -62,7 +62,7 @@ and is repeated twice.
                     TP
 
     B    H    W        R    L
-    0    2    4    6   8    A    C   E
+    0    2    4    6   8    A    C   E             TP
   0 MOVB MOVH MOVW RES MOVR MOVL RES RES
   1 NEGB NEGH NEGW RES NEGR NEGL RES REP
   2 SBRB SBRH SBRW RES SBRR SBRL RES REPZ
@@ -80,7 +80,7 @@ and is repeated twice.
   E RES  RES  RES  RES RES  RES  RES RES
   F RES  RES  RES  RES ESC  ESC  ESC RES
 
-    1    3    5    7   9    B    D   F
+    1    3    5    7   9    B    D   F            TP
   0 SFTB SFTH SFTW RES CVBR NOP  RES BG
   1 SFAB SFAH SFAW RES CVHR CLC  RES BLE
   2 ROTB ROTH ROTW RES CVWR STC  RES BGU
@@ -126,14 +126,13 @@ addressing mode and for most of the instructions the first four bits
 specify the general register to be used in the address evaluation while
 the next four bits indicate the mode. The format is as shown below:
 
-TODO: figure
+   MODE SPECIFIER: [MD REG]
 
 The modes are listed below with their encodings and mnenomics.
 
 #### Addressing Mode Table
-
- Mode                             | Name    | Encoding | Mnemonic 
-----------------------------------|---------|-------- -|--------
+ Mode Name                        |      Encoding   |     | Mnemonic |
+----------------------------------|---------|---------|----------|
 Literal                           | 0,1,2,3 | literal  |  `#n`
 Register Direct                   | C       | Rn       |  `Rn`
 Register Indirect                 | 4       | Rn       |  `(Rn)`
@@ -142,28 +141,26 @@ Autoincrement                     | 6       | Rn       |  `(Rn)+`
 Autoincrement Indirect            | 7       | Rn       |  `@(Rn)+`
 Autoskip                          | 5       | Rn       |  `(Rn)++`
 *Offset+Register Indirect*        |         |          |
- - Byte Offset                    | 8       | Rn       |  `A(Rn)`
- - Halfword Offset                | 9       | Rn       |  `A(Rn)`
- - Word Offset                    | A       | Rn       |  `A(Rn)`
- - (Word Offset+Register) Indirect| B       | Rn       |  `@A(Rn)`
+ . Byte Offset                    | 8       | Rn       |  `A(Rn)`
+ . Halfword Offset                | 9       | Rn       |  `A(Rn)`
+ . Word Offset                    | A       | Rn       |  `A(Rn)`
+(Word Offset+Register) Indirect   | B       | Rn       |  `@A(Rn)`
 RESERVED                          | E       |          |
-
-#### Special Modes: no General Register
-
- Mode                            | Name | Encoding | Mnemonic |
----------------------------------|------|----------|----------|
+*Special Modes no General Register*|        |          |
 *Offset+PC*                      |      |      |
- -  Byte Offset+PC               | F    |   0  |   `S(PC)`
- -  Halfword Offset+PC           | F    |   1  |   `A(PC)`
- -  Word Offset+PC               | F    |   2  |   `S(PC)`
- -  (Word Offset+PC)Indirect     | F    |   3  |   `@A(PC)`
- -  Offset+SP Byte Offset+SP     | F    |   4  |   `S(SP)`
- -  Halfword Offset+SP           | F    |   5  |   `S(SP)`
- -  Word Offset+SP               | F    |   6  |   `A(SP)`
- -  (Word Offset+SP)Indirect     | F    |   7  |   `@A(SP)`
- -  Direct Byte Offset           | F    |   8  |   `A`
- -  Halfword Offset              | F    |   9  |   `A`
- -  Word Offset                  | F    |   A  |   `A`
+ . Byte Offset+PC               | F    |   0  |   `S(PC)`
+ . Halfword Offset+PC           | F    |   1  |   `A(PC)`
+ . Word Offset+PC               | F    |   2  |   `S(PC)`
+(Word Offset+PC)Indirect         | F    |   3  |   `@A(PC)`
+*Offset+SP*                      |      |      |
+ . Byte Offset+SP                | F    |   4  |   `S(SP)`
+ . Halfword Offset+SP           | F    |   5  |   `S(SP)`
+ . Word Offset+SP               | F    |   6  |   `A(SP)`
+(Word Offset+SP)Indirect         | F    |   7  |   `@A(SP)`
+*Direct*                        |      |      |
+ . Byte Offset                  | F    |   8  |   `A`
+ . Halfword Offset              | F    |   9  |   `A`
+ . Word Offset                  | F    |   A  |   `A`
 (Word)Indirect                   | F    |   B  |  `@A`
 Push/Pop                         | F    |   C  |  `STK`
 Immediate                        | F    |   D  |  `#n`
@@ -205,7 +202,7 @@ signaled.
 
 #### Register Direct
 ```
-| `C` Rn |
+| C Rn |
 ```
 
 In this mode the operand is contained in the indicated register. The
@@ -271,9 +268,10 @@ row elements.
 
 #### Offset + Register
 ```
-| 8,9,A Rn |
-8 = byte, 9 = halfword, A = word
+| 8,9,A Rn | 8 = byte, 9 = halfword, A = word
 ```
+
+*[ed note:  it's not clear whether these should be 8,9,A or A,B,C]*
 
 This mode calculates the address of the operand by adding the value in
 Rn to the offset which is a signed integer whose length is determined by
@@ -296,8 +294,7 @@ of a general register (see below).
 
 #### Offset + PC
 ```
-| F 0,1,2 |
-0 = byte, 1 = halfword, 2 = word
+| F 0,1,2 | 0 = byte, 1 = halfword, 2 = word
 ```
 
 The address is calculated by adding the address of the instruction
@@ -311,8 +308,7 @@ independent code.
 
 #### (Offset + PC) Indirect
 ```
-| F 3 | ????
-Word offset
+| F 3 | Word offset
 ```
 
 The address of the instruction (the contents of PC) is added to the
@@ -322,8 +318,7 @@ operand.
 
 #### Offset + SP
 ```
-| F 4,5,6 |
-4 = byte, 5 = halfword, 6 = word
+| F 4,5,6 | 4 = byte, 5 = halfword, 6 = word
 ```
 
 The address is calculated by adding the `SP` and the sign extended
@@ -343,8 +338,7 @@ that address is the address of the operand.
 
 #### Direct
 ```
-| F 8,9,A |
-8 = byte, 9 = halfword, A = word
+| F 8,9,A | 8 = byte, 9 = halfword, A = word
 ```
 
 The address is the unsigned value of the offset (byte, halfword or word
