@@ -656,12 +656,38 @@ The node nucleus has system calls that, in response to messages from the Periphe
 This section specifies the calls that a program running in a node can make on the nucleus. It also shows how a program running in the Peripheral Controller that is managing a node can, through sending and receiving messages, access some of the system calls. The list of system calls includes ##STR47##
 
 # 6 SYSTEM MANAGEMENT
-In this section a method for initializing the system is presented, especially how to propagate the initializing software through the array. There is more than one acceptable algorithm. The one we present here is a very simple one with high efficiency. The algorithm is based on a tree structure. The diagram below shows the initialization responsibility for each processor assuming there are 16 processors. The binary numbers are the processor ID's and the decimal numbers represent the stage (in time) of the initialization. ##STR48##
+In this section a method for initializing the system is presented, especially how to propagate the initializing software through the array. There is more than one acceptable algorithm. The one we present here is a very simple one with high efficiency. The algorithm is based on a tree structure. The diagram below shows the initialization responsibility for each processor assuming there are 16 processors. The binary numbers are the processor ID's and the decimal numbers represent the stage (in time) of the initialization.
+
+FIGURE with binary tree.
 
 The assembly language code that implements this algorithm is:
 
-```
-
-__________________________________________________________________________ MOVW ID,R1 ;ID is memory location containing the            ;processor ID LDPR R1,IDREG            ;the ID is loaded into the ID processor            ;register FFO  R1,R2 ;R2 = # of trailing zeros in ID SUBB #1,R2 ; JL   END   ;no trailing zeros → this processor is            ;a leaf on the graphLOOP: MOVW #1,R3 ;compute ID of neighbor by complementing SFTW R2,R3 ;one of the trailing zeros MOVW R1,R4 ; XORW R3,R4 ;R4 = new ID{send message length to port #(R2)}{receive status; use timeout}a.      dead (timed out)b.      failed self testc.      parity errord.      alive and well{if alive MOVW R4,ID;put new ID in memory}{send copy of code and new ID to R2}REPC       R2    ;JMP        LOOP  ;END:{look for responses and EROF}__________________________________________________________________________
-```
+~~~
+__________________________________________________________________________ 
+      MOVW ID,R1             ;ID is memory location containing the
+                             ;processor
+      ID LDPR R1,IDREG       ;the ID is loaded into the ID processor
+                             ;register
+      FFO  R1,R2             ;R2 = # of trailing zeros in ID
+      SUBB #1,R2             ;
+      JL   END               ;no trailing zeros → this processor is
+                             ;a leaf on the graph
+LOOP: MOVW #1,R3             ;compute ID of neighbor by complementing
+      SFTW R2,R3             ;one of the trailing zeros
+      MOVW R1,R4             ;
+      XORW R3,R4             ;R4 = new ID
+  {send message length to port #(R2)}
+  {receive status; use timeout}
+      a.      dead (timed out)
+      b.      failed self test
+      c.      parity error
+      d.      alive and well
+  {if alive MOVW R4,ID;put new ID in memory}
+  {send copy of code and new ID to R2}
+      REPC       R2          ;
+      JMP        LOOP        ;
+END:
+  {look for responses and EROF}
+__________________________________________________________________________
+~~~
 
