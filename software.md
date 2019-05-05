@@ -429,22 +429,22 @@ The assembly language code that implements this algorithm is listed below.
 
 ```
        MOVW ID,R1        ;ID is memory location
-                         ;containing the processor
-       IDLDPR R1,IDREG   ;the ID is loaded into the ID
-                         ;processor register
-       FFO R1,R2         ;R2 = # of trailing zeros i
-       IDSUBB #1,R2      ;
-       JL END            ;no trailing zeros => this
-                         ;processor is a leaf on the graph
-LOOP:  MOVW #1,R3        ;compute ID of neighbor by
-                         ;complementing one of the
-       SFTW R2,R3        ;trailing zeros
+                         ;containing the processor ID
+       LDPR R1,IDREG     ;the ID is loaded into the ID processor
+                         ;register
+       FFO R1,R2         ;R2 = # of trailing zeros in ID
+       SUBB #1,R2        ;
+       JL END            ;no trailing zeros => this processor is 
+	                     ;a leaf on the graph
+LOOP:  MOVW #1,R3        ;compute ID of neighbor by complementing
+       SFTW R2,R3        ;one of the  trailing zeros
        MOVW R1,R4        ;
        XORW R3,R4        ; R4 = new ID{send message length to port #(R2)}
                          ; {receive status; use timeout}
                          ;     a. dead (timed out)
                          ;     b. failed self test
-                         ;     c. parity errord. alive and well
+						 ;     c. parity error
+						 ;     d. alive and well
                          ; {if alive MOVW R4,ID;put new ID in memory}
                          ; {send copy of code and new ID to R2}
        REPC R2           ;
