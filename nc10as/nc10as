@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+
+import opcodes
+import operands
+import re
+import sys
+
+# An instruction is an opcode and zero, one or two operands.  Opcodes
+# have a mnemonic form and a binary (single byte) form Operands have a
+# mnemonic form, a multi-byte binary form and a descriptive form.  The
+# 'descriptive' form is useful for debugging (e.g., 'register direct'),
+# but when the descritption is 'label', the binary form is None and
+# the mnemonic is the label.
+
+class Insn:
+    def __init__(self, words):
+        self.mnemonic = words
+        self.opc = opcodes._str2op[words[0]]
+        self.otypes = opcodes.operand_types(self.opc)
+        self.encoded = bytes((self.opc,))
+        self.operands = []
+        if len(self.otypes) != len(words)-1:
+            raise RuntimeError("wrong number of operands:" + str(words))
+        for t in zip(words[1:], self.otypes):
+            try:
+                self.operands.append(operands.Operand(*t))
+            except RuntimeError as e:
+                print(e, "operand =", t)
+
+    repr_names = ('mnemonic', 'operands')
+    def __repr__(self):
+        return ", ".join([repr(getattr(self, n)) for n in self.repr_names])
+
+    def encoded_len(self):
+        l = (1,1)
+        for operand in self.operands:
+            ol = operand.encoded_len
+            l = tuple(map(sum, zip(l, ol)))
+        return l
+        
+def do_directive(words):
+    print("Directive: ", words)
+    
+def do_label(label):
+    labels[label] = len(insns)
+
+comment_chars = re.compile(r"[;!]")
+def process(line):
+    line = re.split(comment_chars, line, 1)[0] # discard comments
+    label, colon, rest = line.rpartition(':')
+    if label:
+        do_label(label)
+    rest = rest.strip()
+    if not rest:
+        return
+    words = re.split(r'[\s,]+', rest)
+    if len(words) == 0:
+        return
+    try:
+        if words[0].startswith('.'):
+            do_directive(words)
+        else:
+            insns.append(Insn(words))
+    except Exception as e:
+        print("Caught {} on line {}".format(e, fileinput.lineno()))
+    
+def encoded_len(b, e):
+    backwards = e < b
+    if backwards:
+        e,b = b,e
+    l = (0, 0)
+    for insn in insns[b:e]:
+        il = insn.encoded_len()
+        l = tuple(map(sum, zip(il, l)))
+    return l if not backwards else (-x for x in l)
+
+# In the second pass we scan the insns to resolve LABELs.
+# The 'insns' array is modified. 
+def secondpass():
+    unencoded = []
+    for iidx,insn in enumerate(insns):
+        for opidx,op in enumerate(insn.operands):
+            if op.encoded is None:
+                unencoded.append((iidx, opidx))
+
+    while unencoded:
+        still_unencoded = []
+        any_forward_progress = False
+        for iidx,opidx in unencoded:
+            insn = insns[iidx]
+            op = insn.operands[opidx]
+            l = op.mnemonic
+            lidx = labels[l]
+            delta_min,delta_max = encoded_len(iidx, lidx)
+            if delta_min == delta_max:
+                insn.operands[opidx] = operands.Operand("#%d"%delta_min)
+                #print("resolved:  insn.operands[{}] = {}".format(opidx, insn.operands[opidx]))
+                any_forward_progress = True
+            else:
+                # we can't resolve it, but maybe we can narrow it?
+                if op.narrow_encoded_len(delta_min, delta_max):
+                    #print("forward progress:  insn[{}] = {}".format(iidx, insns[iidx]))
+                    any_forward_progress = True
+                still_unencoded.append((iidx, opidx))
+
+        # ???? IS THIS SAFE ???
+        # It's possible that we can cease to make forward progress when
+        # we've got a few overlapping labels close to 32 or 256-bytes away
+        # from where they're used (see trouble.s).  When that happens, we
+        # break the logjam by assuming that one of them is the smaller
+        # distance.
+        if still_unencoded and not any_forward_progress:
+            print("Uh oh.  No forward progress...")
+            for iidx,opidx in still_unencoded[:1]:
+                op = insns[iidx].operands[opidx]
+                l = op.mnemonic
+                lidx = labels[l]
+                delta_min, delta_max = encoded_len(iidx, lidx)
+                print("assume instruction iidx:{} ({}) lidx:{} is delta_min={} from its label, not delta_max={}".format(iidx, insns[iidx].mnemonic, lidx, delta_min, delta_max), file=sys.stderr)
+                op.narrow_encoded_len(delta_min, delta_min)
+        unencoded = still_unencoded
+
+def print_line_by_line():
+    nbytes = 0
+    for insn in insns:
+        bytes = bytearray((insn.opc,))
+        for op in insn.operands:
+            bytes += op.encoded
+        # output looks like:
+        #  NNNN: <hexbytes> ; ["MNEM", "OPERAND1" "OPERAND2"}
+        print("{:04d}: {:22s} ; {}".format(nbytes, bytes.hex(), insn.mnemonic))
+        nbytes += len(bytes)
+
+def print_hex_bytes():
+        bytes = bytearray()
+        for insn in insns:
+            bytes += bytearray((insn.opc,))
+            for op in insn.operands:
+                bytes += op.encoded
+
+        print(bytes.hex())
+
+if __name__ == '__main__':
+    import argparse
+    import fileinput
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--raw', action='store_true', default=False, help='just output the hexstring.  No line-by-line context')
+    parser.add_argument('files', metavar='FILE', nargs='*', help='files to read, if empty, stdin is used')
+    args = parser.parse_args()
+
+    # If you would call fileinput.input() without files it would try
+    # to process all arguments.  We pass '-' as only file when
+    # argparse got no files which will cause fileinput to read from
+    # stdin
+    insns = []
+    labels = {}
+
+    for line in fileinput.input(files=args.files if len(args.files) > 0 else ('-', )):
+        process(line)
+        
+    secondpass()
+
+    if args.raw:
+        print_hex_bytes()
+    else:
+        print_line_by_line()
+
+    
